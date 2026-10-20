@@ -149,14 +149,14 @@
 
 <div class="card">
     <h3>
-        <span>2. Destinatários (Empresas e Contatos com E-mail)</span>
+        <span>2. Destinatários (Contacts associados com e-mail)</span>
         <div>
             <button class="btn-select-all" onclick="marcarTodos(true)">Todos</button>
             <button class="btn-select-all" onclick="marcarTodos(false)">Nenhum</button>
         </div>
     </h3>
     <div id="membrosContainer" class="membros-list">
-        <div style="font-size: 12px; color: #64748b;">Carregando empresas da oportunidade...</div>
+        <div style="font-size: 12px; color: #64748b;">Carregando contatos associados à oportunidade...</div>
     </div>
 </div>
 
@@ -182,7 +182,7 @@
     function logDebug(title, data) {
         const d = document.getElementById("debugLog");
         const strData = (typeof data === "object") ? JSON.stringify(data, null, 2) : String(data);
-        d.innerHTML += `<br><strong>[${new Date().toLocaleTimeString()}] ${title}:</strong> <span style="color:#a5f3fc;">${strData}</span>`;
+        d.innerHTML += `<br><strong>[${new Date().toLocaleTimeString()}] ${escapeHtml(title)}:</strong> <span style="color:#a5f3fc;">${escapeHtml(strData)}</span>`;
         d.scrollTop = d.scrollHeight;
     }
 
@@ -191,6 +191,12 @@
         if (!type) { s.style.display = "none"; return; }
         s.textContent = msg;
         s.className = "status " + type;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, char => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[char]);
     }
 
     function marcarTodos(status) {
@@ -227,7 +233,7 @@
             return;
         }
 
-        setStatus("Carregando empresas e produto...", "loading");
+        setStatus("Carregando contatos associados e produto...", "loading");
         logDebug("CHAMANDO DELUGE", { oppId: currentOppId });
 
         const reqData = { arguments: JSON.stringify({ oppId: currentOppId }) };
@@ -239,7 +245,7 @@
             const dataObj = parseStrictJson(response);
             logDebug("OBJETO PARSADO", dataObj);
 
-            if (dataObj && Array.isArray(dataObj.empresas)) {
+            if (dataObj && dataObj.status === "success" && Array.isArray(dataObj.empresas)) {
                 const pNome = dataObj.produto_nome || "Produto";
                 const qtd = dataObj.quantidade || "Consulte-nos";
 
@@ -260,12 +266,12 @@
                                 <div class="membro-item">
                                     <label style="margin:0; font-weight:normal; cursor:pointer; display:flex; align-items:center; gap:6px;">
                                         <input type="checkbox" class="chk-membro" checked
-                                            data-empresa-id="${emp.id}"
-                                            data-empresa-nome="${emp.nome}"
-                                            data-contato-id="${ct.id}"
-                                            data-contato-nome="${ct.nome}"
-                                            data-email="${ct.email}">
-                                        <span><strong>${emp.nome}</strong> - ${ct.nome} (<em>${ct.email}</em>)</span>
+                                            data-empresa-id="${escapeHtml(emp.id)}"
+                                            data-empresa-nome="${escapeHtml(emp.nome)}"
+                                            data-contato-id="${escapeHtml(ct.id)}"
+                                            data-contato-nome="${escapeHtml(ct.nome)}"
+                                            data-email="${escapeHtml(ct.email)}">
+                                        <span><strong>${escapeHtml(emp.nome)}</strong> - ${escapeHtml(ct.nome)} (<em>${escapeHtml(ct.email)}</em>)</span>
                                     </label>
                                 </div>
                             `;
@@ -274,14 +280,15 @@
                 });
 
                 if (!htmlMembros) {
-                    container.innerHTML = "<div style='font-size:12px; color:#ef4444; padding:4px;'>Nenhum contato com e-mail cadastrado nas empresas do subformulário.</div>";
+                    container.innerHTML = "<div style='font-size:12px; color:#ef4444; padding:4px;'>Nenhum contato associado com e-mail. Vincule contatos na lista Contacts da oportunidade pelo botão Assign.</div>";
                 } else {
                     container.innerHTML = htmlMembros;
                 }
 
                 setStatus("", "");
             } else {
-                setStatus("Falha ao retornar lista de destinatários.", "error");
+                document.getElementById("membrosContainer").textContent = "";
+                setStatus(dataObj?.message || "Falha ao retornar lista de destinatários.", "error");
                 logDebug("MOTIVO FALHA", "empresas não é um Array ou veio vazio.");
             }
         } catch (e) {

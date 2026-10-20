@@ -1,0 +1,13 @@
+{
+  "name": "fitstock-zoho-crm-campanha",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Widget Criar Campanha do Zoho CRM da FitStock",
+  "scripts": {
+    "check": "node verify-widget.cjs",
+    "test": "node verify-widget.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "24.1.3"
+  }
+}
