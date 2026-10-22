@@ -4,8 +4,8 @@
   "private": true,
   "description": "Widget Criar Campanha do Zoho CRM da FitStock",
   "scripts": {
-    "check": "node verify-widget.cjs",
-    "test": "node verify-widget.cjs"
+    "check": "node verify-widget.cjs && node --test --test-isolation=none --test-reporter=spec owner-ui.test.cjs",
+    "test": "node verify-widget.cjs && node --test --test-isolation=none --test-reporter=spec owner-ui.test.cjs"
   },
   "devDependencies": {
     "jsdom": "24.1.3"

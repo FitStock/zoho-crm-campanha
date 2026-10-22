@@ -15,6 +15,7 @@ async function load(output) {
     ZOHO: {
       embeddedApp: { on() {}, init: () => Promise.resolve() },
       CRM: {
+        ...require("./owner-fixture.cjs"),
         INTERACTOR: { getRecord: () => Promise.resolve({}) },
         FUNCTIONS: {
           execute: async (name, request) => {
