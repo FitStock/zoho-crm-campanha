@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Criar Campanha & Disparar E-mails - Fitstock</title>
+    <title>Preparar Campanha para Revisão - Fitstock</title>
     <!-- ZOHO CRM WIDGET SDK -->
     <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
     <style>
@@ -122,6 +122,7 @@
 
 <div class="card">
     <h3>1. Dados da Campanha</h3>
+    <p style="font-size:13px;color:#475569">Crie a campanha com os contatos vinculados. A operação revisará o conteúdo e fará o envio em uma segunda etapa, na campanha.</p>
 <div class="form-group">
     <label for="responsavelSelect">Responsável</label>
     <select id="responsavelSelect" disabled aria-describedby="responsavelStatus"></select>
@@ -129,24 +130,25 @@
 </div>
     <div class="form-group">
         <label for="nomeCampanha">Nome da Campanha *</label>
-        <input type="text" id="nomeCampanha" placeholder="Carregando...">
+        <input type="text" id="nomeCampanha" maxlength="255" placeholder="Carregando...">
     </div>
     <div class="row">
         <div class="form-group">
             <label for="tipoCampanha">Tipo *</label>
             <select id="tipoCampanha">
-                <option value="Email">Email</option>
-                <option value="Telemarketing">Telemarketing</option>
-                <option value="Webinar">Webinar</option>
-                <option value="Outro">Outro</option>
+                <option value="Oferta">Oferta</option>
+                <option value="Busca">Busca</option>
+                <option value="Busca e Oferta">Busca e Oferta</option>
+                <option value="Institucional">Institucional</option>
+                <option value="Apresentação">Apresentação</option>
+                <option value="Conversão">Conversão</option>
+                <option value="Others">Outros</option>
             </select>
         </div>
         <div class="form-group">
             <label for="statusCampanha">Status *</label>
-            <select id="statusCampanha">
-                <option value="Em andamento">Em andamento</option>
-                <option value="Planejada">Planejada</option>
-                <option value="Concluída">Concluída</option>
+            <select id="statusCampanha" disabled>
+                <option value="Planning">Planejamento — aguardando revisão</option>
             </select>
         </div>
     </div>
@@ -154,7 +156,7 @@
 
 <div class="card">
     <h3>
-        <span>2. Destinatários (Contacts associados com e-mail)</span>
+        <span>2. Contatos que serão vinculados à campanha</span>
         <div>
             <button class="btn-select-all" onclick="marcarTodos(true)">Todos</button>
             <button class="btn-select-all" onclick="marcarTodos(false)">Nenhum</button>
@@ -166,19 +168,20 @@
 </div>
 
 <div class="card">
-    <h3>3. E-mail da Campanha (Editável)</h3>
+    <h3>3. Rascunho para revisão na campanha</h3>
     <div class="form-group">
         <label for="assuntoInput">Assunto do E-mail</label>
-        <input type="text" id="assuntoInput" placeholder="Carregando...">
+        <input type="text" id="assuntoInput" maxlength="255" placeholder="Carregando...">
     </div>
     <div class="form-group">
         <label for="corpoInput">Mensagem (Com Variáveis {{Nome_Contato}} e {{Nome_Empresa}})</label>
-        <textarea id="corpoInput" rows="5" placeholder="Carregando..."></textarea>
+        <textarea id="corpoInput" maxlength="32000" rows="5" placeholder="Carregando..."></textarea>
     </div>
 </div>
 
-<button id="campanhaButton" disabled class="btn-submit" onclick="executarCampanha()">Criar Campanha e Disparar E-mails</button>
-<div id="status" class="status"></div>
+<button id="campanhaButton" disabled class="btn-submit" onclick="executarCampanha()">Criar campanha para revisão</button>
+<div id="status" class="status" role="status"></div>
+<button id="abrirCampanhaButton" hidden type="button" class="btn-select-all" onclick="abrirCampanhaCriada()">Abrir campanha para revisar</button>
 
 <script>
     const FUNCTION_API_NAME = "dispararcampanhawidget";
@@ -239,6 +242,9 @@ function responsavelSelecionado() {
     let currentOppId = null;
     let campanhaPronta = false;
     let criandoCampanha = false;
+    let tentativaCampanha = null;
+    let campanhaIdCriada = null;
+    let campanhaConcluida = false;
 
     function logDebug(title, data) {
         const d = document.getElementById("debugLog");
@@ -363,69 +369,69 @@ function responsavelSelecionado() {
         }
     }
 
+    function abrirCampanhaCriada() {
+        if (campanhaIdCriada) ZOHO.CRM.UI.Record.open({ Entity: "Campaigns", RecordID: campanhaIdCriada });
+    }
+
     async function executarCampanha() {
-        if (criandoCampanha || !campanhaPronta) return;
-        const responsavelId = responsavelSelecionado();
-        if (!responsavelId) { setStatus("Selecione um responsável ativo.", "error"); return; }
-        const nomeCamp = document.getElementById("nomeCampanha").value;
-        const tipoCamp = document.getElementById("tipoCampanha").value;
-        const statusCamp = document.getElementById("statusCampanha").value;
-        const assunto = document.getElementById("assuntoInput").value;
-        const corpo = document.getElementById("corpoInput").value.replace(/\n/g, "<br>");
-
-        const checkboxes = document.querySelectorAll(".chk-membro:checked");
-        if (checkboxes.length === 0) {
-            alert("Selecione pelo menos um contato para disparar a campanha.");
-            return;
-        }
-
-        const membros = [];
-        checkboxes.forEach(chk => {
-            membros.push({
-                empresa_id: chk.getAttribute("data-empresa-id"),
-                nome_empresa: chk.getAttribute("data-empresa-nome"),
-                contato_id: chk.getAttribute("data-contato-id"),
-                nome_contato: chk.getAttribute("data-contato-nome"),
-                email: chk.getAttribute("data-email")
-            });
-        });
-
-        criandoCampanha = true;
-        document.getElementById("campanhaButton").disabled = true;
-        document.getElementById("responsavelSelect").disabled = true;
-        setStatus("Criando campanha e disparando e-mails...", "loading");
-
-        const payload = {
-            Owner: {id: responsavelId},
-            nome_campanha: nomeCamp,
-            tipo_campanha: tipoCamp,
-            status_campanha: statusCamp,
-            assunto_email: assunto,
-            corpo_email: corpo,
-            membros: membros
-        };
-
-        const reqData = {
-            arguments: JSON.stringify({ action: "executar_campanha", payload: payload, oppId: currentOppId })
-        };
-
-        try {
-            const response = await ZOHO.CRM.FUNCTIONS.execute(FUNCTION_API_NAME, reqData);
-            logDebug("EXECUÇÃO RESPOSTA", response);
-
-            const outExec = parseStrictJson(response);
-            if (outExec && outExec.status === "success") {
-                setStatus(`Campanha criada com sucesso! ${outExec.total_disparados} e-mails enviados. Redirecionando...`, "success");
-                setTimeout(() => {
-                    ZOHO.CRM.UI.Record.open({ Entity: "Campaigns", RecordID: outExec.campanha_id });
-                }, 1500);
-            } else {
-                setStatus("Erro ao executar campanha.", "error");
+        if (criandoCampanha || campanhaConcluida || !campanhaPronta) return;
+        if (!tentativaCampanha) {
+            const responsavelId = responsavelSelecionado();
+            if (!responsavelId) { setStatus("Selecione um responsável ativo.", "error"); return; }
+            const nomeCamp = document.getElementById("nomeCampanha").value.trim();
+            const assunto = document.getElementById("assuntoInput").value;
+            const corpo = document.getElementById("corpoInput").value;
+            if (!nomeCamp || nomeCamp.length > 255 || assunto.length > 255 || corpo.length > 32000) {
+                setStatus("Confira nome, assunto (até 255 caracteres) e mensagem (até 32.000).", "error");
+                return;
             }
-        } catch (e) {
-            setStatus("Falha de comunicação com o backend.", "error");
-            logDebug("ERRO EXECUÇÃO", e.message);
+            const checkboxes = [...document.querySelectorAll(".chk-membro:checked")];
+            if (checkboxes.length === 0) { alert("Selecione pelo menos um contato para vincular à campanha."); return; }
+            const membros = checkboxes.map(chk => ({ contato_id: chk.getAttribute("data-contato-id") }));
+            const requestId = typeof crypto !== "undefined" && crypto.randomUUID
+                ? crypto.randomUUID() : "req_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+            tentativaCampanha = {
+                action: "criar_campanha", request_id: requestId, oppId: currentOppId,
+                payload: {
+                    Owner: {id: responsavelId}, nome_campanha: nomeCamp,
+                    tipo_campanha: document.getElementById("tipoCampanha").value,
+                    status_campanha: "Planning", assunto_email: assunto,
+                    corpo_email: corpo, membros
+                }
+            };
         }
+        criandoCampanha = true;
+        const button = document.getElementById("campanhaButton");
+        button.disabled = true;
+        document.querySelectorAll("input, select, textarea, .btn-select-all").forEach(el => el.disabled = true);
+        setStatus("Preparando campanha e vinculando contatos. Nenhum e-mail será enviado.", "loading");
+        try {
+            const response = await ZOHO.CRM.FUNCTIONS.execute(FUNCTION_API_NAME, {arguments: JSON.stringify(tentativaCampanha)});
+            const out = parseStrictJson(response);
+            if (out?.campanha_id && /^\d+$/.test(String(out.campanha_id))) {
+                campanhaIdCriada = String(out.campanha_id);
+                const openButton = document.getElementById("abrirCampanhaButton");
+                openButton.hidden = false;
+                openButton.disabled = false;
+            }
+            if (out?.status === "success" && campanhaIdCriada) {
+                campanhaConcluida = true;
+                button.textContent = "Campanha criada para revisão";
+                setStatus(`Campanha em Planejamento com ${out.total_vinculados ?? tentativaCampanha.payload.membros.length} contato(s) vinculado(s). Assunto e mensagem salvos para revisão. Nenhum e-mail enviado.`, "success");
+            } else if (out?.status === "partial_failure" && campanhaIdCriada) {
+                button.disabled = false;
+                button.textContent = "Concluir vínculos nesta campanha";
+                setStatus(out.message || "Campanha criada sem envio, mas faltam vínculos. Clique para concluir a mesma campanha antes de revisar o público.", "error");
+            } else {
+                button.disabled = false;
+                button.textContent = "Tentar novamente sem duplicar";
+                setStatus(out?.message || "Não foi possível confirmar a preparação. Repita neste formulário para continuar a mesma tentativa.", "error");
+            }
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = "Tentar novamente sem duplicar";
+            setStatus("A resposta não foi confirmada. Repita neste formulário: a mesma chave protege contra campanha duplicada. Nenhum envio é executado por esta etapa.", "error");
+        } finally { criandoCampanha = false; }
     }
 
     function inicializarCapturaID() {
@@ -480,3 +486,4 @@ function responsavelSelecionado() {
 </script>
 </body>
 </html>
+
