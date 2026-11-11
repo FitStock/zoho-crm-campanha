@@ -1,3 +1,41 @@
+# Criar campanha para revisão — FitStock
+
+Atualizado em 11/11/2026.
+
+## Fluxo atual
+
+1. Na oportunidade de mercado, associe os contatos desejados e abra **Criar Campanha**.
+2. Revise responsável, tipo, contatos selecionados, assunto e mensagem.
+3. Clique em **Criar campanha para revisão**. A campanha é gravada em **Planejamento**, com os contatos vinculados. Esta etapa não envia emails.
+4. Se houver vínculos pendentes, use **Concluir vínculos nesta campanha** no mesmo formulário. A mesma chave retoma a preparação e evita campanha duplicada.
+5. Abra a campanha e revise **Assunto Revisao**, **Mensagem Revisao** e a lista **Contacts**. Selecione os contatos e use o botão nativo **Send Email** somente quando a operação decidir preparar o envio. O envio final é manual.
+
+Os campos de revisão são rascunhos de conteúdo; não são um email agendado nem um template carregado automaticamente no compositor. Na etapa manual, revise a personalização e configure os campos de mesclagem do Zoho; os marcadores `{{Nome_Contato}}` e `{{Nome_Empresa}}` do rascunho não devem ser enviados literalmente.
+
+## Backend
+
+Função existente `dispararcampanhawidget`, ID `4606955000026521051`. O nome foi conservado para manter as referências do widget. O código V11 não contém `sendmail`, endpoint de envio ou rotina automática de disparo. Autenticação e botão existentes foram preservados.
+
+- Lê apenas contatos associados à oportunidade, com email, e relê a associação ao confirmar.
+- Grava `Campaign_Name`, `Type`, `Owner`, `Status: Planejamento`, `Assunto_Revisao`, `Mensagem_Revisao`, `Description` e a chave única `Chave_Preparacao_Campanha`.
+- A criação usa `trigger: []` e a autorização nativa que já era usada pela função; nenhum escopo foi ampliado.
+- Vincula contatos por `zoho.crm.updateRelatedRecord` e verifica a lista relacionada após gravar.
+- Usa no máximo 50 novos vínculos por passagem. Volumes maiores ou falhas parciais podem exigir continuar a mesma tentativa; não declara sucesso antes da confirmação completa.
+- A chave tem o formato `OM_<opportunity_id>_<request_id>`. Um novo formulário representa nova intenção; retente no mesmo formulário se a resposta se perder.
+- O assunto aceita até 255 caracteres e a mensagem até 32.000. Os limites de leitura do caminho existente e os tempos de execução do Zoho continuam se aplicando.
+
+## Validação
+
+`npm run check` executa a validação do HTML, os testes de responsável e os testes de criação, seleção, perda de resposta, repetição, falha parcial e clique duplo. Os testes usam SDK simulado e não enviam emails.
+
+A prova pela interface do CRM criou uma campanha fictícia, gravou o rascunho e confirmou dois membros com `Sent_On: null`. Uma retomada concluiu o segundo vínculo na mesma campanha. Os registros usados na prova são identificados como testes e devem ser removidos após o registro das evidências.
+
+## Histórico anterior à alteração de 11/11/2026
+
+As notas abaixo descrevem entregas anteriores; quando mencionam criação com disparo, esse comportamento foi substituído pelo fluxo de revisão acima.
+
+---
+
 # FitStock — Criar Campanha no Zoho CRM
 
 Widget externo do botão **Criar Campanha**. Carrega os contatos associados à oportunidade pela função Deluge `dispararcampanhawidget` e permite selecionar os destinatários antes de criar a campanha e enviar e-mails.
@@ -53,3 +91,4 @@ A URL anterior do widget era `https://abiezerlima.github.io/campanha/index.html`
 O formulário pré-seleciona o usuário conectado ao Zoho CRM e permite escolher outro usuário ativo. O responsável é enviado em Owner; a função dedicada valida o usuário antes de gravar. Falha de leitura de usuários bloqueia a criação. Não muda o remetente do e-mail nem os responsáveis de registros existentes.
 
 Reversão da interface: restaurar os arquivos da tag before-owner-selector-2026-10-21 em um novo commit. O backend mantém compatibilidade com formulários anteriores. Backup privado da função e procedimento completo preservados no projeto administrativo FitStock.
+
