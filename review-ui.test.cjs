@@ -82,3 +82,25 @@ test("accents, supported Unicode and line breaks remain unchanged", async () => 
   await s.run("executarCampanha()");
   assert.equal(s.calls[1].payload.corpo_email, body);
 });
+
+test("mass send stays unavailable before and after preparation, including partial failures", async () => {
+  for (const result of [
+    { status: "success", campanha_id: "800", total_vinculados: 2 },
+    { status: "partial_failure", campanha_id: "800", pendentes: ["102"] },
+    "lost",
+  ]) {
+    const s = await setup([result]);
+    const send = s.doc.getElementById("enviarEmailsButton");
+    assert.equal(send.disabled, true);
+    assert.equal(send.getAttribute("onclick"), null);
+    assert.equal(send.getAttribute("aria-describedby"), "envioDisponibilidade");
+    assert.match(s.doc.getElementById("envioDisponibilidade").textContent, /Envio indisponível/);
+    send.click();
+    assert.equal(s.calls.length, 1);
+    await s.run("executarCampanha()");
+    assert.equal(send.disabled, true);
+    send.click();
+    assert.equal(s.calls.length, 2);
+    assert.equal(s.calls[1].action, "criar_campanha");
+  }
+});
