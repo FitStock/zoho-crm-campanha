@@ -55,3 +55,30 @@ test('double click cannot run two simultaneous creations',async()=>{
  await s.run('executarCampanha()');assert.equal(s.calls.length,2);
  s.release({details:{output:JSON.stringify({status:'success',campanha_id:'800',total_vinculados:2})}});await first;
 });
+
+test("default draft contains no characters that CRM replaces with question marks", async () => {
+  const s = await setup([]);
+  assert.equal([...s.doc.getElementById("corpoInput").value].some(c => c.codePointAt(0) > 0xFFFF), false);
+});
+
+test("unsupported characters are rejected before creation and can be corrected", async () => {
+  for (const field of ["nomeCampanha", "assuntoInput", "corpoInput"]) {
+    const s = await setup([{status:"success",campanha_id:"800",total_vinculados:2}]);
+    s.doc.getElementById(field).value = "Conteúdo 📲";
+    await s.run("executarCampanha()");
+    assert.equal(s.calls.length, 1, `no creation for ${field}`);
+    assert.match(s.doc.getElementById("status").textContent, /caracteres|emojis/i);
+    assert.equal(s.doc.getElementById(field).disabled, false);
+    s.doc.getElementById(field).value = "Conteúdo corrigido";
+    await s.run("executarCampanha()");
+    assert.equal(s.calls.length, 2);
+  }
+});
+
+test("accents, supported Unicode and line breaks remain unchanged", async () => {
+  const s = await setup([{status:"success",campanha_id:"800",total_vinculados:2}]);
+  const body = "Olá, ação e negociação.\nSão Paulo — 中文";
+  s.doc.getElementById("corpoInput").value = body;
+  await s.run("executarCampanha()");
+  assert.equal(s.calls[1].payload.corpo_email, body);
+});
