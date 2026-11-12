@@ -171,7 +171,7 @@
 
 <div class="card">
     <h3>3. Rascunho para revisão na campanha</h3>
-    <p style="font-size:12px;color:#64748b">O assunto e a mensagem serão salvos na campanha. Na etapa de envio, revise a personalização e use os campos de mesclagem do Zoho.</p>
+    <p style="font-size:12px;color:#64748b">O assunto e a mensagem serão salvos na campanha. Use texto sem emojis que o Zoho não preserva. Na etapa de envio, revise a personalização e use os campos de mesclagem do Zoho.</p>
     <div class="form-group">
         <label for="assuntoInput">Assunto do E-mail</label>
         <input type="text" id="assuntoInput" maxlength="255" placeholder="Carregando...">
@@ -326,7 +326,7 @@ function responsavelSelecionado() {
                 document.getElementById("nomeCampanha").value = `Campanha Fitstock - ${pNome}`;
                 document.getElementById("assuntoInput").value = `Oportunidade Comercial: ${pNome} disponível na Fitstock`;
 
-                const templateTexto = `Olá {{Nome_Contato}}, tudo bem?\n\nIdentificamos uma oportunidade exclusiva para a {{Nome_Empresa}} referente ao fornecimento do item ${pNome}.\n\nTemos um lote disponível com as seguintes condições de mercado:\n- Produto: ${pNome}\n- Quantidade Disponível: ${qtd}\n\nCaso tenham demanda para este produto ou queiram alinhar condições de negociação, entrem em contato diretamente com o nosso time comercial:\n\n📲 André Grell: +55 11 99312-2497 ( https://wa.me/5511993122497?text=Olá%20André,%20tenho%20interesse%20no%20produto%20${encodeURIComponent(pNome)} )\n📲 Natália: +55 11 91123-5550 ( https://wa.me/5511911235550?text=Olá%20Natália,%20tenho%20interesse%20no%20produto%20${encodeURIComponent(pNome)} )\n\nFicamos no aguardo do seu retorno!\n\nAtenciosamente,\nEquipe Fitstock`;
+                const templateTexto = `Olá {{Nome_Contato}}, tudo bem?\n\nIdentificamos uma oportunidade exclusiva para a {{Nome_Empresa}} referente ao fornecimento do item ${pNome}.\n\nTemos um lote disponível com as seguintes condições de mercado:\n- Produto: ${pNome}\n- Quantidade Disponível: ${qtd}\n\nCaso tenham demanda para este produto ou queiram alinhar condições de negociação, entrem em contato diretamente com o nosso time comercial:\n\nWhatsApp André Grell: +55 11 99312-2497 ( https://wa.me/5511993122497?text=Olá%20André,%20tenho%20interesse%20no%20produto%20${encodeURIComponent(pNome)} )\nWhatsApp Natália: +55 11 91123-5550 ( https://wa.me/5511911235550?text=Olá%20Natália,%20tenho%20interesse%20no%20produto%20${encodeURIComponent(pNome)} )\n\nFicamos no aguardo do seu retorno!\n\nAtenciosamente,\nEquipe Fitstock`;
 
                 document.getElementById("corpoInput").value = templateTexto;
 
@@ -385,6 +385,12 @@ function responsavelSelecionado() {
             const nomeCamp = document.getElementById("nomeCampanha").value.trim();
             const assunto = document.getElementById("assuntoInput").value;
             const corpo = document.getElementById("corpoInput").value;
+            // CRM replaces supplementary Unicode characters with '?'. Reject them
+            // before creating anything; never silently change the user's draft.
+            if ([nomeCamp, assunto, corpo].some(texto => /[\uD800-\uDFFF]/.test(texto))) {
+                setStatus("Remova emojis e outros caracteres não suportados pelo Zoho do nome, assunto ou mensagem. Nada foi criado; seu texto continua disponível para edição.", "error");
+                return;
+            }
             if (!nomeCamp || nomeCamp.length > 255 || assunto.length > 255 || corpo.length > 32000) {
                 setStatus("Confira nome, assunto (até 255 caracteres) e mensagem (até 32.000).", "error");
                 return;
