@@ -85,8 +85,8 @@ test("accents, supported Unicode and line breaks remain unchanged", async () => 
 
 const mailConfig = {status:"success", campaigns:[{id:"800",name:"Campanha"}], senders:[{email:"sender@example.invalid",user_name:"Operação"}]};
 const mailCampaign = {status:"success",subject:"Olá {{Nome_Contato}}",body:"Mensagem {{Nome_Empresa}}",members:[
-  {id:"101",Full_Name:"A",Email:"a@example.invalid"},
-  {id:"102",Full_Name:"B",Email:"b@example.invalid"}
+  {id:"101",Full_Name:"A",Email:"a@example.invalid",Unsubscribed_Mode:null,Unsubscribed_Time:null},
+  {id:"102",Full_Name:"B",Email:"b@example.invalid",Unsubscribed_Mode:null,Unsubscribed_Time:null}
 ],previous:[]};
 const mailPreviewResult = {status:"success",campaign_id:"800",from:"sender@example.invalid",recipients:[
   {id:"101",name:"A",email:"a@example.invalid",subject:"Olá A",body:"Mensagem Empresa",hash:"a".repeat(64)},
@@ -168,4 +168,15 @@ test("an accepted email with a missing history receipt stops the batch without u
   await s.run("confirmarEnvioMassa()");
   assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);
   assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*1 aceito/s);
+});
+
+test("native unsubscribe fields and unavailable eligibility block recipients before preview", async () => {
+  const campaign={...mailCampaign,members:[...mailCampaign.members,
+    {id:"105",Full_Name:"E",Email:"e@example.invalid",Unsubscribed_Mode:"Manual",Unsubscribed_Time:null},
+    {id:"106",Full_Name:"F",Email:"f@example.invalid",Unsubscribed_Mode:null,Unsubscribed_Time:"2026-11-13T00:00:00-03:00"},
+    {id:"107",Full_Name:"G",Email:"g@example.invalid"}
+  ]};
+  const s=await setup([mailConfig,campaign]); await s.run("prepararEnvioMassa()");
+  assert.deepEqual([...s.doc.querySelectorAll(".email-contact")].filter(c=>c.disabled).map(c=>c.value),["105","106","107"]);
+  assert.deepEqual([...s.doc.querySelectorAll(".email-contact")].filter(c=>c.checked).map(c=>c.value),["101","102"]);
 });
