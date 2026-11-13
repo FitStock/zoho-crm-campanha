@@ -93,90 +93,78 @@ const mailPreviewResult = {status:"success",campaign_id:"800",from:"sender@examp
   {id:"102",name:"B",email:"b@example.invalid",subject:"Olá B",body:"Mensagem Empresa",hash:"b".repeat(64)}
 ]};
 const acceptedMail = {status:"accepted",receipt_saved:true};
-test("opening review and generating a preview never send email or create a campaign", async () => {
-  const s = await setup([mailConfig, mailCampaign, mailPreviewResult]);
-  assert.equal(s.doc.getElementById("enviarEmailsButton").disabled,false);
-  await s.run("prepararEnvioMassa()");
-  await s.run("gerarPreviaEnvio()");
-  assert.deepEqual(s.calls.slice(1).map(c=>c.action),["mail_config","mail_campaign","mail_preview"]);
-  assert.equal(s.doc.getElementById("emailSendFinal").disabled,true);
-  await s.run("confirmarEnvioMassa()");
-  assert.equal(s.calls.length,4);
-  assert.equal(s.doc.getElementById("emailPreview").hidden,false);
-});
-test("explicit confirmation sends each reviewed contact separately and blocks double clicks", async () => {
-  const s = await setup([mailConfig,mailCampaign,mailPreviewResult,"waiting",acceptedMail]);
-  await s.run("prepararEnvioMassa()"); await s.run("gerarPreviaEnvio()");
-  s.doc.getElementById("emailConfirm").checked=true;
-  s.run("habilitarConfirmacaoEnvio()");
-  assert.equal(s.doc.getElementById("emailSendFinal").disabled,false);
-  s.doc.getElementById("emailBody").value="DOM altered after review";
-  const first=s.run("confirmarEnvioMassa()"); await s.run("confirmarEnvioMassa()");
-  assert.equal(s.calls.length,5);
-  s.release({details:{output:JSON.stringify(acceptedMail)}}); await first;
-  const sends=s.calls.filter(c=>c.action==="mail_send");
-  assert.equal(sends.length,2);
-  assert.deepEqual(sends.map(c=>c.contact_ids),[["101"],["102"]]);
-  assert.deepEqual(sends.map(c=>c.hash),["a".repeat(64),"b".repeat(64)]);
-  assert.ok(sends.every(c=>c.confirmed===true && c.body==="Mensagem {{Nome_Empresa}}"));
-  await s.run("confirmarEnvioMassa()"); assert.equal(s.calls.length,6);
-  assert.match(s.doc.getElementById("emailStatus").textContent,/2 email.*aceito/);
-});
-test("a lost response stops the batch and never retries the uncertain contact automatically", async () => {
-  const s=await setup([mailConfig,mailCampaign,mailPreviewResult,"lost"]);
-  await s.run("prepararEnvioMassa()"); await s.run("gerarPreviaEnvio()");
-  s.doc.getElementById("emailConfirm").checked=true;
-  await s.run("confirmarEnvioMassa()"); await s.run("confirmarEnvioMassa()");
-  assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);
-  assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*0 aceito.*Não haverá reenvio automático/s);
-  assert.equal(s.doc.getElementById("emailSendFinal").disabled,true);
-});
-test("opt-out, missing email and previously recorded addresses cannot be selected", async () => {
-  const campaign={...mailCampaign,members:[
-    ...mailCampaign.members,
-    {id:"103",Full_Name:"C",Email_Opt_Out:true,Email:"c@example.invalid"},
-    {id:"104",Full_Name:"D"}
-  ],previous:[{Email_Destinatario:"a@example.invalid",Estado_do_Envio:"Aceito pelo Zoho"}]};
-  const s=await setup([mailConfig,campaign]); await s.run("prepararEnvioMassa()");
-  const boxes=[...s.doc.querySelectorAll(".email-contact")];
-  assert.deepEqual(boxes.filter(c=>c.disabled).map(c=>c.value),["101","103","104"]);
-  assert.deepEqual(boxes.filter(c=>c.checked).map(c=>c.value),["102"]);
-});
-test("unavailable OAuth connection shows its pending setup and never enables sending", async () => {
-  const s=await setup([{status:"unavailable",message:"Conecte FitStock Campanhas Email"}]);
-  await s.run("prepararEnvioMassa()");
-  assert.equal(s.calls.length,2);
-  assert.match(s.doc.getElementById("emailStatus").textContent,/Conecte FitStock Campanhas Email/);
-  assert.equal(s.doc.getElementById("emailSendFinal").disabled,true);
-});
-test("editing invalidates confirmation and incomplete preview responses cannot send", async () => {
-  const s=await setup([mailConfig,mailCampaign,mailPreviewResult]);
-  await s.run("prepararEnvioMassa()"); await s.run("gerarPreviaEnvio()");
-  s.doc.getElementById("emailConfirm").checked=true;
-  s.run("editarRevisaoEnvio()"); await s.run("confirmarEnvioMassa()");
-  assert.equal(s.calls.length,4); assert.equal(s.doc.getElementById("emailConfirm").checked,false);
-  assert.equal(s.doc.getElementById("emailSendFinal").disabled,true);
-  const bad=await setup([mailConfig,mailCampaign,{status:"success",recipients:[mailPreviewResult.recipients[0]]}]);
-  await bad.run("prepararEnvioMassa()"); await bad.run("gerarPreviaEnvio()");
-  bad.doc.getElementById("emailConfirm").checked=true; await bad.run("confirmarEnvioMassa()");
-  assert.equal(bad.calls.length,4); assert.match(bad.doc.getElementById("emailStatus").textContent,/incompleta/);
-});
-test("an accepted email with a missing history receipt stops the batch without understating the known acceptance", async () => {
-  const s=await setup([mailConfig,mailCampaign,mailPreviewResult,{status:"accepted",receipt_saved:false,message:"Confira o histórico"}]);
-  await s.run("prepararEnvioMassa()"); await s.run("gerarPreviaEnvio()");
-  s.doc.getElementById("emailConfirm").checked=true;
-  await s.run("confirmarEnvioMassa()");
-  assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);
-  assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*1 aceito/s);
-});
 
-test("native unsubscribe fields and unavailable eligibility block recipients before preview", async () => {
-  const campaign={...mailCampaign,members:[...mailCampaign.members,
-    {id:"105",Full_Name:"E",Email:"e@example.invalid",Unsubscribed_Mode:"Manual",Unsubscribed_Time:null},
-    {id:"106",Full_Name:"F",Email:"f@example.invalid",Unsubscribed_Mode:null,Unsubscribed_Time:"2026-11-13T00:00:00-03:00"},
-    {id:"107",Full_Name:"G",Email:"g@example.invalid"}
-  ]};
-  const s=await setup([mailConfig,campaign]); await s.run("prepararEnvioMassa()");
-  assert.deepEqual([...s.doc.querySelectorAll(".email-contact")].filter(c=>c.disabled).map(c=>c.value),["105","106","107"]);
-  assert.deepEqual([...s.doc.querySelectorAll(".email-contact")].filter(c=>c.checked).map(c=>c.value),["101","102"]);
+test("opening saved draft never sends and provides no second editor or preview controls", async () => {
+  const s=await setup([mailConfig,mailCampaign]); await s.run("prepararEnvioMassa()");
+  assert.deepEqual(s.calls.slice(1).map(c=>c.action),["mail_config","mail_campaign"]);
+  for(const id of ["emailBody","emailSubject","emailPreviewButton","emailConfirm"]) assert.equal(s.doc.getElementById(id),null);
+  assert.match(s.doc.getElementById("emailDraftSummary").textContent,/Assunto salvo: Olá/);
+  assert.equal(s.doc.getElementById("emailSendFinal").disabled,false);
+});
+test("one send click uses only server saved draft and freezes recipients despite DOM edits",async()=>{
+ const s=await setup([mailConfig,mailCampaign,mailPreviewResult,"waiting",acceptedMail]);
+ await s.run("prepararEnvioMassa()"); const first=s.run("enviarRascunhoSalvo()");
+ await new Promise(r=>setImmediate(r)); await s.run("enviarRascunhoSalvo()");
+ s.doc.getElementById("corpoInput").value="Unsaved edit must not be sent";
+ s.doc.getElementById("emailSender").value="attacker@example.invalid";
+ s.release({details:{output:JSON.stringify(acceptedMail)}}); await first;
+ const sends=s.calls.filter(c=>c.action==="mail_send");
+ assert.equal(sends.length,2);
+ assert.deepEqual(sends.map(c=>c.contact_ids),[["101"],["102"]]);
+ assert.ok(sends.every(c=>c.confirmed===true && c.use_saved_draft===true && !("body" in c) && !("subject" in c) && c.from==="sender@example.invalid"));
+ assert.deepEqual(sends.map(c=>c.hash),["a".repeat(64),"b".repeat(64)]);
+ await s.run("enviarRascunhoSalvo()");assert.equal(s.calls.filter(c=>c.action==="mail_send").length,2);
+});
+test("double click during internal validation cannot start another batch or close panel",async()=>{
+ const s=await setup([mailConfig,mailCampaign,"waiting",acceptedMail,acceptedMail]);await s.run("prepararEnvioMassa()");
+ const first=s.run("enviarRascunhoSalvo()");await s.run("enviarRascunhoSalvo()");s.run("fecharRevisaoEnvio()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_preview").length,1);
+ assert.equal(s.doc.getElementById("emailReviewPanel").hidden,false);
+ s.release({details:{output:JSON.stringify(mailPreviewResult)}});await first;
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,2);
+});
+test("lost send response stops batch and never retries automatically",async()=>{
+ const s=await setup([mailConfig,mailCampaign,mailPreviewResult,"lost"]);await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);
+ assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*0 aceito.*Não haverá reenvio automático/s);
+ assert.equal(s.doc.getElementById("emailSendFinal").disabled,true);
+});
+test("unsubscribe, missing email, unreadable eligibility and prior receipts block recipients",async()=>{
+ const campaign={...mailCampaign,members:[...mailCampaign.members,
+ {id:"103",Email:"c@example.invalid",Unsubscribed_Mode:"Manual",Unsubscribed_Time:null},
+ {id:"104",Unsubscribed_Mode:null,Unsubscribed_Time:null},
+ {id:"105",Email:"e@example.invalid"},
+ {id:"106",Email:"f@example.invalid",Unsubscribed_Mode:null,Unsubscribed_Time:"2026-11-13"},
+ {id:"107",Email:"g@example.invalid",Email_Opt_Out:true,Unsubscribed_Mode:null,Unsubscribed_Time:null}
+ ],previous:[{Email_Destinatario:"a@example.invalid",Estado_do_Envio:"Aceito pelo Zoho"}]};
+ const s=await setup([mailConfig,campaign]);await s.run("prepararEnvioMassa()");
+ assert.deepEqual([...s.doc.querySelectorAll(".email-contact")].filter(c=>c.disabled).map(c=>c.value),["101","103","104","105","106","107"]);
+ assert.deepEqual([...s.doc.querySelectorAll(".email-contact")].filter(c=>c.checked).map(c=>c.value),["102"]);
+});
+test("unavailable existing connection never enables sending",async()=>{
+ const s=await setup([{status:"unavailable",message:"Conexao zoho_crm indisponivel"}]);await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.length,2);assert.match(s.doc.getElementById("emailStatus").textContent,/zoho_crm/);assert.equal(s.doc.getElementById("emailSendFinal").disabled,true);
+});
+test("incomplete or duplicate internal validation cannot send",async()=>{
+ for(const recipients of [[mailPreviewResult.recipients[0]],[mailPreviewResult.recipients[0],mailPreviewResult.recipients[0]]]){
+ const s=await setup([mailConfig,mailCampaign,{status:"success",recipients}]);await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,0);
+ assert.match(s.doc.getElementById("emailStatus").textContent,/Nenhum envio iniciado/);
+ }
+});
+test("accepted send with missing history receipt counts acceptance and stops batch",async()=>{
+ const s=await setup([mailConfig,mailCampaign,mailPreviewResult,{status:"accepted",receipt_saved:false}]);await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*1 aceito/s);
+});
+test("missing saved draft, empty audience and missing sender do not start send",async()=>{
+ for(const campaign of [{...mailCampaign,subject:""},{...mailCampaign,body:""},{...mailCampaign,members:[]}]){
+ const s=await setup([mailConfig,campaign]);await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");assert.equal(s.calls.filter(c=>c.action==="mail_send"||c.action==="mail_preview").length,0);
+ }
+ const s=await setup([{...mailConfig,senders:[]}]);await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");assert.equal(s.calls.length,2);
+});
+test("server changed draft hash is rejected and remaining recipients are not sent",async()=>{
+ const s=await setup([mailConfig,mailCampaign,mailPreviewResult,{status:"error",message:"O rascunho mudou. Tente novamente."}]);
+ await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);
+ assert.match(s.doc.getElementById("emailStatus").textContent,/rascunho mudou/);
 });

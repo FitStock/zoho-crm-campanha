@@ -130,7 +130,7 @@
 
 <div class="card">
     <h3>1. Dados da Campanha</h3>
-    <p style="font-size:13px;color:#475569">Crie a campanha com os contatos vinculados. Depois, use Enviar emails em massa para revisar o conteúdo e confirmar o disparo em uma etapa separada.</p>
+    <p style="font-size:13px;color:#475569">Crie a campanha com os contatos vinculados. Depois, use Enviar emails em massa para enviar o rascunho salvo em uma etapa separada.</p>
 <div class="form-group">
     <label for="responsavelSelect">Responsável</label>
     <select id="responsavelSelect" disabled aria-describedby="responsavelStatus"></select>
@@ -177,7 +177,7 @@
 
 <div class="card">
     <h3>3. Rascunho para revisão na campanha</h3>
-    <p style="font-size:12px;color:#64748b">O assunto e a mensagem serão salvos na campanha. Use texto sem emojis que o Zoho não preserva. O botão Enviar emails em massa carrega esse rascunho e gera uma prévia personalizada antes da confirmação.</p>
+    <p style="font-size:12px;color:#64748b">O assunto e a mensagem serão salvos na campanha. Use texto sem emojis que o Zoho não preserva. O botão Enviar emails em massa envia o rascunho já salvo na campanha, sem outro editor ou prévia.</p>
     <div class="form-group">
         <label for="assuntoInput">Assunto do E-mail</label>
         <input type="text" id="assuntoInput" maxlength="255" placeholder="Carregando...">
@@ -197,7 +197,7 @@
         </div>
         <div class="campaign-action">
             <button id="enviarEmailsButton" type="button" disabled class="btn-submit" onclick="prepararEnvioMassa()" aria-describedby="envioDisponibilidade">Enviar emails em massa</button>
-            <p id="envioDisponibilidade">Abre a revisão de uma campanha desta oportunidade. Confira remetente, mensagem e destinatários; o envio exige confirmação final.</p>
+            <p id="envioDisponibilidade">Escolha a campanha e o remetente e clique em Enviar rascunho agora. O conteúdo será o rascunho já salvo.</p>
         </div>
     </div>
 </div>
@@ -205,26 +205,18 @@
 <button id="abrirCampanhaButton" hidden type="button" class="btn-select-all" onclick="abrirCampanhaCriada()">Abrir campanha para revisar</button>
 
 <section id="emailReviewPanel" class="card" hidden aria-labelledby="emailReviewTitle" style="margin-top:16px">
-    <h3 id="emailReviewTitle">Revisar envio em massa</h3>
-    <p style="font-size:12px;line-height:1.5">Escolha uma campanha já criada nesta oportunidade. Cada contato receberá um email individual, sem template e sem expor os demais destinatários. Os resultados ficam em <strong>Envios de Campanha</strong> na oportunidade. Aceito pelo Zoho não comprova entrega ou abertura.</p>
+    <h3 id="emailReviewTitle">Enviar rascunho salvo</h3>
+    <p style="font-size:12px;line-height:1.5">O envio usa o assunto e a mensagem já salvos na campanha. Cada contato recebe um email individual, com suas variáveis personalizadas. Acompanhe os resultados em <strong>Envios de Campanha</strong> na oportunidade.</p>
     <div id="emailStatus" role="status" style="font-size:13px;margin:12px 0;white-space:pre-wrap"></div>
     <label for="emailCampaign">Campanha</label>
     <select id="emailCampaign" onchange="carregarCampanhaEnvio()"></select>
     <label for="emailSender" style="margin-top:12px">Remetente autorizado</label>
-    <select id="emailSender" onchange="invalidarPreviaEnvio()"></select>
-    <label for="emailSubject" style="margin-top:12px">Assunto do envio</label>
-    <input id="emailSubject" maxlength="255" oninput="invalidarPreviaEnvio()">
-    <label for="emailBody" style="margin-top:12px">Mensagem do envio</label>
-    <textarea id="emailBody" rows="8" maxlength="32000" oninput="invalidarPreviaEnvio()"></textarea>
-    <p style="font-size:12px">Variáveis disponíveis: {{Nome_Contato}} e {{Nome_Empresa}}. As edições desta revisão valem para o envio; o rascunho original da campanha é preservado.</p>
+    <select id="emailSender"></select>
+    <p id="emailDraftSummary" style="font-size:13px;white-space:pre-wrap"></p>
     <label style="margin-top:12px">Destinatários vinculados à campanha</label>
-    <div id="emailRecipients" class="membros-list" onchange="invalidarPreviaEnvio()"></div>
-    <button id="emailPreviewButton" type="button" class="btn-submit" disabled onclick="gerarPreviaEnvio()" style="margin-top:12px">Gerar prévia para conferência</button>
-    <div id="emailPreview" hidden style="margin-top:12px"></div>
-    <label id="emailConfirmLabel" hidden style="margin-top:12px;line-height:1.5"><input id="emailConfirm" type="checkbox" style="width:auto" onchange="habilitarConfirmacaoEnvio()"> Conferi o remetente, o conteúdo e todos os destinatários desta prévia e autorizo o envio agora.</label>
-    <button id="emailSendFinal" type="button" disabled class="btn-submit" onclick="confirmarEnvioMassa()" style="margin-top:12px">Confirmar envio</button>
-    <button id="emailEditButton" type="button" hidden onclick="editarRevisaoEnvio()" style="margin-top:8px">Editar revisão</button>
-    <button id="emailCloseButton" type="button" onclick="fecharRevisaoEnvio()" style="margin-top:8px">Fechar revisão</button>
+    <div id="emailRecipients" class="membros-list"></div>
+    <button id="emailSendFinal" type="button" disabled class="btn-submit" onclick="enviarRascunhoSalvo()" style="margin-top:12px">Enviar rascunho agora</button>
+    <button id="emailCloseButton" type="button" onclick="fecharRevisaoEnvio()" style="margin-top:8px">Fechar</button>
 </section>
 
 <script>
@@ -291,7 +283,6 @@ function responsavelSelecionado() {
     let campanhaConcluida = false;
     let mailSending = false;
     let mailLoading = false;
-    let mailPreview = null;
     let mailAttempted = false;
     let mailGeneration = 0;
 
@@ -500,17 +491,10 @@ function responsavelSelecionado() {
         if (!result) throw new Error("Resposta do servidor não confirmada.");
         return result;
     }
+
     function emailStatus(text) { document.getElementById("emailStatus").textContent = text; }
-    function invalidarPreviaEnvio() {
-        if (mailSending) return;
-        mailPreview = null;
-        document.getElementById("emailPreview").hidden = true;
-        document.getElementById("emailConfirmLabel").hidden = true;
-        document.getElementById("emailConfirm").checked = false;
-        document.getElementById("emailSendFinal").disabled = true;
-    }
     function travarRevisaoEnvio(locked) {
-        for (const id of ["emailCampaign", "emailSender", "emailSubject", "emailBody", "emailPreviewButton"]) document.getElementById(id).disabled = locked;
+        for (const id of ["emailCampaign", "emailSender", "emailSendFinal"]) document.getElementById(id).disabled = locked;
         document.querySelectorAll(".email-contact:not([data-blocked])").forEach(el => el.disabled = locked);
     }
     function opcoesEmail(select, values, selected) {
@@ -523,39 +507,41 @@ function responsavelSelecionado() {
     }
     async function prepararEnvioMassa() {
         if (mailSending || mailLoading || criandoCampanha || !campanhaPronta) return;
-        mailLoading = true; mailAttempted = false; invalidarPreviaEnvio();
-        document.getElementById("emailConfirm").disabled = false;
-        document.getElementById("emailEditButton").disabled = false;
+        mailLoading = true; mailAttempted = false;
         const generation = ++mailGeneration;
         document.getElementById("emailReviewPanel").hidden = false;
-        document.getElementById("emailEditButton").hidden = true;
         document.getElementById("emailRecipients").replaceChildren();
+        document.getElementById("emailDraftSummary").textContent = "";
         travarRevisaoEnvio(true); emailStatus("Conferindo conexão de envio e campanhas desta oportunidade...");
         try {
             const out = await chamarEmail("mail_config");
             if (generation !== mailGeneration) return;
-            if (out.status !== "success") throw new Error(out.message || "Envio indisponível. Confira a conexão FitStock Campanhas Email.");
+            if (out.status !== "success") throw new Error(out.message || "Envio indisponível. Confira a conexão zoho_crm.");
             opcoesEmail(document.getElementById("emailCampaign"), out.campaigns || [], campanhaIdCriada);
             opcoesEmail(document.getElementById("emailSender"), (out.senders || []).map(s => ({id:s.email, name:`${s.user_name || ""} <${s.email}>`})));
             if (!out.campaigns?.length) { emailStatus("Crie primeiro uma campanha com contatos vinculados. Nenhum email foi enviado."); return; }
+            if (!out.senders?.length) { emailStatus("Nenhum remetente autorizado. Nenhum email foi enviado."); return; }
             await carregarCampanhaEnvio();
         } catch (e) { if (generation === mailGeneration) emailStatus(e.message); }
         finally { mailLoading = false; }
     }
     async function carregarCampanhaEnvio() {
         if (mailSending) return;
-        invalidarPreviaEnvio(); mailAttempted = false;
+        mailAttempted = false;
         const generation = ++mailGeneration;
         const campaignId = document.getElementById("emailCampaign").value;
+        travarRevisaoEnvio(true);
+        document.getElementById("emailRecipients").replaceChildren();
+        document.getElementById("emailDraftSummary").textContent = "";
         if (!campaignId) return;
-        travarRevisaoEnvio(true); emailStatus("Carregando rascunho, contatos e histórico da campanha...");
+        emailStatus("Carregando rascunho salvo, contatos e histórico da campanha...");
         try {
             const out = await chamarEmail("mail_campaign", {campaign_id:campaignId});
             if (generation !== mailGeneration) return;
             if (out.status !== "success") throw new Error(out.message || "Não foi possível carregar a campanha.");
-            document.getElementById("emailSubject").value = out.subject || "";
-            document.getElementById("emailBody").value = out.body || "";
-            const container = document.getElementById("emailRecipients"); container.replaceChildren();
+            if (!String(out.subject || "").trim() || !String(out.body || "").trim()) throw new Error("O rascunho salvo está incompleto. Preencha o assunto e a mensagem na campanha antes de enviar.");
+            document.getElementById("emailDraftSummary").textContent = `Assunto salvo: ${out.subject}. O envio usará a mensagem salva na campanha, com as variáveis personalizadas para cada contato.`;
+            const container = document.getElementById("emailRecipients");
             const previous = new Map((out.previous || []).map(p => [String(p.Email_Destinatario || "").trim().toLowerCase(), p.Estado_do_Envio]));
             for (const contact of out.members || []) {
                 const email = String(contact.Email || "").trim();
@@ -569,73 +555,49 @@ function responsavelSelecionado() {
                 label.append(checkbox, text); container.append(label);
             }
             travarRevisaoEnvio(false);
-            emailStatus("Revise o remetente, o assunto, a mensagem e os destinatários. Endereços já registrados nesta campanha ficam bloqueados para evitar reenvio.");
+            emailStatus("O botão Enviar rascunho agora dispara o conteúdo já salvo na campanha. Não há outro editor ou etapa de prévia.");
         } catch (e) { if (generation === mailGeneration) { emailStatus(e.message); document.getElementById("emailCampaign").disabled = false; } }
     }
-    async function gerarPreviaEnvio() {
-        if (mailSending || mailLoading || mailAttempted) return;
-        invalidarPreviaEnvio();
+    function fecharRevisaoEnvio() {
+        if (mailSending || mailLoading) return;
+        ++mailGeneration; document.getElementById("emailReviewPanel").hidden = true;
+    }
+    async function enviarRascunhoSalvo() {
+        if (mailSending || mailLoading || mailAttempted || document.getElementById("emailSendFinal").disabled) return;
         const contactIds = [...document.querySelectorAll(".email-contact:checked:not([data-blocked])")].map(el => el.value);
         if (!contactIds.length) { emailStatus("Selecione pelo menos um destinatário elegível."); return; }
         const payload = {
             campaign_id:document.getElementById("emailCampaign").value,
             from:document.getElementById("emailSender").value,
-            subject:document.getElementById("emailSubject").value,
-            body:document.getElementById("emailBody").value, contact_ids:contactIds
+            contact_ids:contactIds, use_saved_draft:true
         };
-        if (!payload.subject.trim() || !payload.body.trim() || /[\uD800-\uDFFF]/.test(payload.subject + payload.body)) { emailStatus("Preencha assunto e mensagem, sem emojis que o Zoho não preserva."); return; }
-        mailLoading = true; travarRevisaoEnvio(true); emailStatus("Preparando a prévia personalizada. Nenhum email está sendo enviado.");
-        try {
-            const out = await chamarEmail("mail_preview", payload);
-            if (out.status !== "success" || !out.recipients?.length || out.recipients.length !== contactIds.length || !out.recipients.every(r => contactIds.includes(String(r.id)) && r.hash)) throw new Error(out.message || "Prévia incompleta. Nenhum envio iniciado.");
-            mailPreview = JSON.parse(JSON.stringify({payload, recipients:out.recipients}));
-            const preview = document.getElementById("emailPreview"); preview.replaceChildren();
-            for (const recipient of out.recipients) {
-                const details = document.createElement("details"); details.style.marginBottom = "8px";
-                const summary = document.createElement("summary"); summary.textContent = `${recipient.name} <${recipient.email}> — ${recipient.subject}`;
-                const body = document.createElement("pre"); body.style.whiteSpace = "pre-wrap"; body.style.fontFamily = "inherit"; body.textContent = recipient.body;
-                details.append(summary, body); preview.append(details);
-            }
-            preview.hidden = false; document.getElementById("emailConfirmLabel").hidden = false;
-            document.getElementById("emailEditButton").hidden = false;
-            document.getElementById("emailSendFinal").textContent = `Confirmar envio para ${out.recipients.length} contato(s)`;
-            emailStatus(`Prévia pronta: ${out.recipients.length} destinatário(s). Remetente: ${payload.from}. Abra cada mensagem e confira antes de autorizar.`);
-        } catch (e) { invalidarPreviaEnvio(); travarRevisaoEnvio(false); emailStatus(e.message); }
-        finally { mailLoading = false; }
-    }
-    function habilitarConfirmacaoEnvio() {
-        document.getElementById("emailSendFinal").disabled = !mailPreview || !document.getElementById("emailConfirm").checked || mailSending || mailAttempted;
-    }
-    function editarRevisaoEnvio() {
-        if (mailSending || mailAttempted) return;
-        invalidarPreviaEnvio(); travarRevisaoEnvio(false); document.getElementById("emailEditButton").hidden = true;
-    }
-    function fecharRevisaoEnvio() {
-        if (mailSending || mailLoading) return;
-        ++mailGeneration; invalidarPreviaEnvio(); document.getElementById("emailReviewPanel").hidden = true;
-    }
-    async function confirmarEnvioMassa() {
-        if (mailSending || mailAttempted || !mailPreview || !document.getElementById("emailConfirm").checked) return;
-        mailSending = true; mailAttempted = true;
-        const frozen = JSON.parse(JSON.stringify(mailPreview));
-        document.getElementById("emailSendFinal").disabled = true;
-        document.getElementById("emailConfirm").disabled = true;
+        if (!payload.campaign_id || !payload.from) { emailStatus("Selecione a campanha e o remetente autorizado."); return; }
+        mailLoading = true; travarRevisaoEnvio(true);
         document.getElementById("emailCloseButton").disabled = true;
-        document.getElementById("emailEditButton").disabled = true;
         let accepted = 0;
         try {
+            emailStatus("Validando o rascunho salvo e os destinatários para enviar...");
+            // Technical preflight only. No editor or extra confirmation is shown.
+            const out = await chamarEmail("mail_preview", payload);
+            const ids = (out.recipients || []).map(r => String(r.id));
+            if (out.status !== "success" || ids.length !== contactIds.length || new Set(ids).size !== ids.length || !out.recipients.every(r => contactIds.includes(String(r.id)) && r.hash)) throw new Error(out.message || "Validação incompleta. Nenhum envio iniciado.");
+            const frozen = JSON.parse(JSON.stringify({payload, recipients:out.recipients}));
+            mailSending = true; mailAttempted = true;
             for (const recipient of frozen.recipients) {
                 emailStatus(`Processando ${accepted + 1} de ${frozen.recipients.length}. ${accepted} aceito(s) pelo Zoho.`);
-                const out = await chamarEmail("mail_send", {...frozen.payload, contact_ids:[String(recipient.id)], contact_id:String(recipient.id), hash:recipient.hash, confirmed:true});
-                if (out.status === "accepted") accepted++;
-                if (out.status !== "accepted" || out.receipt_saved !== true) throw new Error(out.message || "Resultado não confirmado. Consulte o histórico antes de outra tentativa.");
+                const sent = await chamarEmail("mail_send", {...frozen.payload, contact_ids:[String(recipient.id)], contact_id:String(recipient.id), hash:recipient.hash, confirmed:true});
+                if (sent.status === "accepted") accepted++;
+                if (sent.status !== "accepted" || sent.receipt_saved !== true) throw new Error(sent.message || "Resultado não confirmado. Consulte o histórico antes de outra tentativa.");
             }
             emailStatus(`${accepted} email(s) aceito(s) pelo Zoho. Confira Envios de Campanha na oportunidade. Isso não comprova entrega ou abertura.`);
         } catch (e) {
-            emailStatus(`Processamento interrompido. ${accepted} aceito(s) confirmado(s). ${e.message} Não haverá reenvio automático; confira Envios de Campanha antes de continuar.`);
+            emailStatus(mailAttempted
+                ? `Processamento interrompido. ${accepted} aceito(s) confirmado(s). ${e.message} Não haverá reenvio automático; confira Envios de Campanha antes de continuar.`
+                : `Nenhum envio iniciado. ${e.message}`);
         } finally {
-            mailSending = false; document.getElementById("emailCloseButton").disabled = false;
-            document.getElementById("emailSendFinal").disabled = true;
+            mailSending = false; mailLoading = false;
+            document.getElementById("emailCloseButton").disabled = false;
+            if (!mailAttempted) travarRevisaoEnvio(false);
         }
     }
 
