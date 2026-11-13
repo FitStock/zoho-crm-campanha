@@ -1,3 +1,24 @@
+# Criar campanha e revisar envio — FitStock
+
+Atualizado em 13/11/2026.
+
+O formulário da oportunidade mantém duas ações separadas:
+
+1. **Criar campanha** salva o rascunho e vincula os contatos, sem enviar emails.
+2. **Enviar emails em massa** abre a revisão de uma campanha já criada nesta oportunidade.
+
+No envio, selecione o remetente autorizado, revise assunto/mensagem e destinatários, gere a prévia e marque a confirmação antes de disparar. Não é necessário escolher um template. Cada contato recebe uma mensagem individual; as variáveis `{{Nome_Contato}}` e `{{Nome_Empresa}}` são substituídas na prévia. Alterações feitas nesta revisão não sobrescrevem o rascunho original.
+
+O usuário precisa autorizar a conexão dedicada **FitStock Campanhas Email**. Sem a conexão, o formulário informa a pendência e não envia. O servidor limita o envio a membros de uma campanha desta oportunidade; administradores e o responsável pela campanha podem executar a revisão. Contatos sem email, com opt-out ou já registrados no histórico não ficam selecionáveis.
+
+O acompanhamento está na lista **Envios de Campanha** da oportunidade. “Aceito pelo Zoho” não comprova entrega ou abertura. Uma resposta incerta interrompe o lote e exige conferir o histórico; não há reenvio automático. O mesmo endereço é protegido contra outro disparo na mesma campanha, inclusive após falha. Para corrigir uma tentativa, a operação deve conferir o registro com TI antes de qualquer novo envio.
+
+O caminho lê até 200 membros da campanha e rejeita listas incompletas. Os limites de envio e API da conta Zoho continuam se aplicando. Lotes interrompidos podem ser revisados reabrindo o formulário; endereços com registro anterior ficam bloqueados.
+
+`npm run check` valida o HTML e executa 19 testes com SDK simulado, sem emails reais. Inclui criação, vínculos, prévia sem disparo, confirmação, proteção contra clique duplo, opt-out, resposta perdida e falha ao salvar recibo. A função existente conserva a criação anterior e encaminha as ações específicas de email para o backend privado.
+
+## Histórico da criação para revisão
+
 # Criar campanha para revisão — FitStock
 
 Atualizado em 11/11/2026.
