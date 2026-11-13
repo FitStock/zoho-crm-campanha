@@ -559,7 +559,8 @@ function responsavelSelecionado() {
             const previous = new Map((out.previous || []).map(p => [String(p.Email_Destinatario || "").trim().toLowerCase(), p.Estado_do_Envio]));
             for (const contact of out.members || []) {
                 const email = String(contact.Email || "").trim();
-                const blocked = !email || contact.Email_Opt_Out === true || previous.has(email.toLowerCase());
+                const eligibilityKnown = Object.prototype.hasOwnProperty.call(contact, "Unsubscribed_Mode") && Object.prototype.hasOwnProperty.call(contact, "Unsubscribed_Time");
+                const blocked = !eligibilityKnown || !email || contact.Email_Opt_Out === true || !!contact.Unsubscribed_Mode || !!contact.Unsubscribed_Time || previous.has(email.toLowerCase());
                 const label = document.createElement("label"); label.className = "membro-item";
                 const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.className = "email-contact";
                 checkbox.value = String(contact.id); checkbox.checked = !blocked; checkbox.disabled = blocked; checkbox.style.width = "auto";
