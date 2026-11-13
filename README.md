@@ -1,21 +1,18 @@
-# Criar campanha e revisar envio — FitStock
+# Criar campanha e enviar rascunho salvo — FitStock
 
 Atualizado em 13/11/2026.
 
-O formulário da oportunidade mantém duas ações separadas:
+1. **Criar campanha** salva assunto, mensagem e contatos vinculados, sem enviar emails.
+2. **Enviar emails em massa** permite escolher a campanha, o remetente autorizado e os destinatários.
+3. **Enviar rascunho agora** dispara o rascunho já salvo, sem outro editor, prévia visível ou caixa de confirmação. O próprio clique é a autorização de envio.
 
-1. **Criar campanha** salva o rascunho e vincula os contatos, sem enviar emails.
-2. **Enviar emails em massa** abre a revisão de uma campanha já criada nesta oportunidade.
+Para mudar o conteúdo, salve os campos Assunto Revisao e Mensagem Revisao na campanha antes de enviar. O servidor relê esses campos na validação e em cada disparo; alterações não salvas no formulário não são usadas. As variáveis {{Nome_Contato}} e {{Nome_Empresa}} são personalizadas por destinatário. Se o conteúdo mudar durante o lote, a validação bloqueia o envio da próxima mensagem.
 
-No envio, selecione o remetente autorizado, revise assunto/mensagem e destinatários, gere a prévia e marque a confirmação antes de disparar. Não é necessário escolher um template. Cada contato recebe uma mensagem individual; as variáveis `{{Nome_Contato}}` e `{{Nome_Empresa}}` são substituídas na prévia. Alterações feitas nesta revisão não sobrescrevem o rascunho original.
+O acompanhamento continua em **Envios de Campanha** na oportunidade. Permanecem os bloqueios de descadastro, email ausente, destinatário fora da campanha e endereço já registrado. Respostas incertas interrompem o lote, sem reenvio automático. Aceito pelo Zoho não comprova entrega ou abertura. Até 200 membros, com bloqueio de leituras incompletas; quotas da conta se aplicam.
 
-O usuário precisa autorizar a conexão dedicada **FitStock Campanhas Email**. Sem a conexão, o formulário informa a pendência e não envia. O servidor limita o envio a membros de uma campanha desta oportunidade; administradores e o responsável pela campanha podem executar a revisão. Contatos sem email, com opt-out ou já registrados no histórico não ficam selecionáveis.
+A conexão de envio é a existente **zoho_crm**, sem alteração de escopos. Na última prova real ela aparecia conectada mas falhou nas consultas de remetentes e organização. O envio permanece bloqueado enquanto essa execução não funcionar. Nenhum email real foi enviado na validação.
 
-O acompanhamento está na lista **Envios de Campanha** da oportunidade. “Aceito pelo Zoho” não comprova entrega ou abertura. Uma resposta incerta interrompe o lote e exige conferir o histórico; não há reenvio automático. O mesmo endereço é protegido contra outro disparo na mesma campanha, inclusive após falha. Para corrigir uma tentativa, a operação deve conferir o registro com TI antes de qualquer novo envio.
-
-O caminho lê até 200 membros da campanha e rejeita listas incompletas. Os limites de envio e API da conta Zoho continuam se aplicando. Lotes interrompidos podem ser revisados reabrindo o formulário; endereços com registro anterior ficam bloqueados.
-
-`npm run check` valida o HTML e executa 19 testes com SDK simulado, sem emails reais. Inclui criação, vínculos, prévia sem disparo, confirmação, proteção contra clique duplo, opt-out, resposta perdida e falha ao salvar recibo. A função existente conserva a criação anterior e encaminha as ações específicas de email para o backend privado.
+`npm run check` executa 22 testes do widget com SDK simulado: criação, envio do rascunho salvo, ausência de segundo editor/prévia, duplo clique, descadastro, alterações concorrentes, resposta perdida e falha no recibo. A função privada mantém compatibilidade com as ações existentes e acrescenta o parâmetro `use_saved_draft: true`.
 
 ## Histórico da criação para revisão
 
