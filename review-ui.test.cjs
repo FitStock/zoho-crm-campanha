@@ -92,7 +92,7 @@ const mailPreviewResult = {status:"success",campaign_id:"800",from:"sender@examp
   {id:"101",name:"A",email:"a@example.invalid",subject:"Olá A",body:"Mensagem Empresa",hash:"a".repeat(64)},
   {id:"102",name:"B",email:"b@example.invalid",subject:"Olá B",body:"Mensagem Empresa",hash:"b".repeat(64)}
 ]};
-const acceptedMail = {status:"accepted",receipt_saved:true};
+const submittedMail = {status:"submitted",transport:"native_sendmail",receipt_saved:true};
 
 test("opening saved draft never sends and provides no second editor or preview controls", async () => {
   const s=await setup([mailConfig,mailCampaign]); await s.run("prepararEnvioMassa()");
@@ -102,12 +102,12 @@ test("opening saved draft never sends and provides no second editor or preview c
   assert.equal(s.doc.getElementById("emailSendFinal").disabled,false);
 });
 test("one send click uses only server saved draft and freezes recipients despite DOM edits",async()=>{
- const s=await setup([mailConfig,mailCampaign,mailPreviewResult,"waiting",acceptedMail]);
+ const s=await setup([mailConfig,mailCampaign,mailPreviewResult,"waiting",submittedMail]);
  await s.run("prepararEnvioMassa()"); const first=s.run("enviarRascunhoSalvo()");
  await new Promise(r=>setImmediate(r)); await s.run("enviarRascunhoSalvo()");
  s.doc.getElementById("corpoInput").value="Unsaved edit must not be sent";
  s.doc.getElementById("emailSender").value="attacker@example.invalid";
- s.release({details:{output:JSON.stringify(acceptedMail)}}); await first;
+ s.release({details:{output:JSON.stringify(submittedMail)}}); await first;
  const sends=s.calls.filter(c=>c.action==="mail_send");
  assert.equal(sends.length,2);
  assert.deepEqual(sends.map(c=>c.contact_ids),[["101"],["102"]]);
@@ -116,7 +116,7 @@ test("one send click uses only server saved draft and freezes recipients despite
  await s.run("enviarRascunhoSalvo()");assert.equal(s.calls.filter(c=>c.action==="mail_send").length,2);
 });
 test("double click during internal validation cannot start another batch or close panel",async()=>{
- const s=await setup([mailConfig,mailCampaign,"waiting",acceptedMail,acceptedMail]);await s.run("prepararEnvioMassa()");
+ const s=await setup([mailConfig,mailCampaign,"waiting",submittedMail,submittedMail]);await s.run("prepararEnvioMassa()");
  const first=s.run("enviarRascunhoSalvo()");await s.run("enviarRascunhoSalvo()");s.run("fecharRevisaoEnvio()");
  assert.equal(s.calls.filter(c=>c.action==="mail_preview").length,1);
  assert.equal(s.doc.getElementById("emailReviewPanel").hidden,false);
@@ -126,7 +126,7 @@ test("double click during internal validation cannot start another batch or clos
 test("lost send response stops batch and never retries automatically",async()=>{
  const s=await setup([mailConfig,mailCampaign,mailPreviewResult,"lost"]);await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");await s.run("enviarRascunhoSalvo()");
  assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);
- assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*0 aceito.*Não haverá reenvio automático/s);
+ assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*0 email.*Não haverá reenvio automático/s);
  assert.equal(s.doc.getElementById("emailSendFinal").disabled,true);
 });
 test("unsubscribe, missing email, unreadable eligibility and prior receipts block recipients",async()=>{
@@ -154,7 +154,7 @@ test("incomplete or duplicate internal validation cannot send",async()=>{
 });
 test("accepted send with missing history receipt counts acceptance and stops batch",async()=>{
  const s=await setup([mailConfig,mailCampaign,mailPreviewResult,{status:"accepted",receipt_saved:false}]);await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");
- assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*1 aceito/s);
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*1 email/s);
 });
 test("missing saved draft, empty audience and missing sender do not start send",async()=>{
  for(const campaign of [{...mailCampaign,subject:""},{...mailCampaign,body:""},{...mailCampaign,members:[]}]){
@@ -178,4 +178,34 @@ test("native unsubscribe fields and unavailable eligibility block recipients bef
   const s=await setup([mailConfig,campaign]); await s.run("prepararEnvioMassa()");
   assert.deepEqual([...s.doc.querySelectorAll(".email-contact")].filter(c=>c.disabled).map(c=>c.value),["105","106","107"]);
   assert.deepEqual([...s.doc.querySelectorAll(".email-contact")].filter(c=>c.checked).map(c=>c.value),["101","102"]);
+});
+
+test("native submission is counted without claiming API acceptance or delivery",async()=>{
+ const s=await setup([mailConfig,mailCampaign,mailPreviewResult,submittedMail,submittedMail]);
+ await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,2);
+ assert.ok(s.calls.filter(c=>c.action==="mail_preview"||c.action==="mail_send").every(c=>c.transport==="native_sendmail"));
+ assert.match(s.doc.getElementById("emailStatus").textContent,/2 email.*2 submetido.*não comprova entrega/s);
+ assert.doesNotMatch(s.doc.getElementById("emailStatus").textContent,/aceito|entregue/i);
+});
+test("native submission with a lost receipt remains counted and stops the next recipient",async()=>{
+ const s=await setup([mailConfig,mailCampaign,mailPreviewResult,{...submittedMail,receipt_saved:false}]);
+ await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);
+ assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*1 email.*1 submetido.*Não haverá reenvio automático/s);
+});
+test("unknown transport never counts a submission as confirmed",async()=>{
+ const s=await setup([mailConfig,mailCampaign,mailPreviewResult,{status:"submitted",transport:"unknown",receipt_saved:true}]);
+ await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_send").length,1);
+ assert.match(s.doc.getElementById("emailStatus").textContent,/interrompido.*0 email/s);
+});
+test("native history and reconciled CRM history remain blocked against resend",async()=>{
+ const s=await setup([mailConfig,{...mailCampaign,previous:[
+ {Email_Destinatario:"a@example.invalid",Estado_do_Envio:"Submetido ao envio nativo"},
+ {Email_Destinatario:"b@example.invalid",Estado_do_Envio:"Registrado como enviado no CRM"}
+ ]}]);
+ await s.run("prepararEnvioMassa()");await s.run("enviarRascunhoSalvo()");
+ assert.equal(s.calls.filter(c=>c.action==="mail_send"||c.action==="mail_preview").length,0);
+ assert.ok([...s.doc.querySelectorAll(".email-contact")].every(c=>c.disabled&&!c.checked));
 });

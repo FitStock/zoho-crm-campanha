@@ -206,7 +206,7 @@
 
 <section id="emailReviewPanel" class="card" hidden aria-labelledby="emailReviewTitle" style="margin-top:16px">
     <h3 id="emailReviewTitle">Enviar rascunho salvo</h3>
-    <p style="font-size:12px;line-height:1.5">O envio usa o assunto e a mensagem já salvos na campanha. Cada contato recebe um email individual, com suas variáveis personalizadas. Acompanhe os resultados em <strong>Envios de Campanha</strong> na oportunidade.</p>
+    <p style="font-size:12px;line-height:1.5">O envio usa o assunto e a mensagem já salvos na campanha. O remetente é o usuário conectado. Cada contato recebe um email individual pelo envio nativo, com suas variáveis personalizadas. Acompanhe os resultados em <strong>Envios de Campanha</strong> na oportunidade.</p>
     <div id="emailStatus" role="status" style="font-size:13px;margin:12px 0;white-space:pre-wrap"></div>
     <label for="emailCampaign">Campanha</label>
     <select id="emailCampaign" onchange="carregarCampanhaEnvio()"></select>
@@ -516,7 +516,7 @@ function responsavelSelecionado() {
         try {
             const out = await chamarEmail("mail_config");
             if (generation !== mailGeneration) return;
-            if (out.status !== "success") throw new Error(out.message || "Envio indisponível. Confira a conexão zoho_crm.");
+            if (out.status !== "success") throw new Error(out.message || "Envio nativo indisponível para o usuário conectado.");
             opcoesEmail(document.getElementById("emailCampaign"), out.campaigns || [], campanhaIdCriada);
             opcoesEmail(document.getElementById("emailSender"), (out.senders || []).map(s => ({id:s.email, name:`${s.user_name || ""} <${s.email}>`})));
             if (!out.campaigns?.length) { emailStatus("Crie primeiro uma campanha com contatos vinculados. Nenhum email foi enviado."); return; }
@@ -569,12 +569,14 @@ function responsavelSelecionado() {
         const payload = {
             campaign_id:document.getElementById("emailCampaign").value,
             from:document.getElementById("emailSender").value,
-            contact_ids:contactIds, use_saved_draft:true
+            contact_ids:contactIds, use_saved_draft:true, transport:"native_sendmail"
         };
         if (!payload.campaign_id || !payload.from) { emailStatus("Selecione a campanha e o remetente autorizado."); return; }
         mailLoading = true; travarRevisaoEnvio(true);
         document.getElementById("emailCloseButton").disabled = true;
         let accepted = 0;
+        let submitted = 0;
+        const totals = () => `${accepted + submitted} email(s) processado(s)${submitted ? `; ${submitted} submetido(s) ao envio nativo` : ""}`;
         try {
             emailStatus("Validando o rascunho salvo e os destinatários para enviar...");
             // Technical preflight only. No editor or extra confirmation is shown.
@@ -584,15 +586,16 @@ function responsavelSelecionado() {
             const frozen = JSON.parse(JSON.stringify({payload, recipients:out.recipients}));
             mailSending = true; mailAttempted = true;
             for (const recipient of frozen.recipients) {
-                emailStatus(`Processando ${accepted + 1} de ${frozen.recipients.length}. ${accepted} aceito(s) pelo Zoho.`);
+                emailStatus(`Processando ${accepted + submitted + 1} de ${frozen.recipients.length}. ${totals()}.`);
                 const sent = await chamarEmail("mail_send", {...frozen.payload, contact_ids:[String(recipient.id)], contact_id:String(recipient.id), hash:recipient.hash, confirmed:true});
                 if (sent.status === "accepted") accepted++;
-                if (sent.status !== "accepted" || sent.receipt_saved !== true) throw new Error(sent.message || "Resultado não confirmado. Consulte o histórico antes de outra tentativa.");
+                if (sent.status === "submitted" && sent.transport === "native_sendmail") submitted++;
+                if (!(sent.status === "accepted" || (sent.status === "submitted" && sent.transport === "native_sendmail")) || sent.receipt_saved !== true) throw new Error(sent.message || "Resultado não confirmado. Consulte o histórico antes de outra tentativa.");
             }
-            emailStatus(`${accepted} email(s) aceito(s) pelo Zoho. Confira Envios de Campanha na oportunidade. Isso não comprova entrega ou abertura.`);
+            emailStatus(`${totals()}. Confira Envios de Campanha na oportunidade. Isso não comprova entrega ou abertura.`);
         } catch (e) {
             emailStatus(mailAttempted
-                ? `Processamento interrompido. ${accepted} aceito(s) confirmado(s). ${e.message} Não haverá reenvio automático; confira Envios de Campanha antes de continuar.`
+                ? `Processamento interrompido. ${totals()}. ${e.message} Não haverá reenvio automático; confira Envios de Campanha antes de continuar.`
                 : `Nenhum envio iniciado. ${e.message}`);
         } finally {
             mailSending = false; mailLoading = false;

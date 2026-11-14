@@ -1,18 +1,18 @@
-# Criar campanha e enviar rascunho salvo — FitStock
+# Campanhas com envio nativo — FitStock
 
 Atualizado em 13/11/2026.
 
-1. **Criar campanha** salva assunto, mensagem e contatos vinculados, sem enviar emails.
-2. **Enviar emails em massa** permite escolher a campanha, o remetente autorizado e os destinatários.
-3. **Enviar rascunho agora** dispara o rascunho já salvo, sem outro editor, prévia visível ou caixa de confirmação. O próprio clique é a autorização de envio.
+1. **Criar campanha** salva o rascunho e vincula os contatos, sem disparar emails.
+2. **Enviar emails em massa** abre a seleção da campanha e dos destinatários. O remetente será o usuário conectado no CRM; o servidor confere que ele corresponde ao usuário OAuth da ação.
+3. **Enviar rascunho agora** usa Assunto_Revisao e Mensagem_Revisao salvos na campanha, sem outro editor ou prévia visível. Cada contato recebe uma mensagem individual em texto simples, com Nome_Contato e Nome_Empresa personalizados.
 
-Para mudar o conteúdo, salve os campos Assunto Revisao e Mensagem Revisao na campanha antes de enviar. O servidor relê esses campos na validação e em cada disparo; alterações não salvas no formulário não são usadas. As variáveis {{Nome_Contato}} e {{Nome_Empresa}} são personalizadas por destinatário. Se o conteúdo mudar durante o lote, a validação bloqueia o envio da próxima mensagem.
+O mecanismo é o sendmail nativo do Deluge. O transporte não depende da conexão zoho_crm nem de nova autorização OAuth para emails. A conexão de leitura já utilizada continua atendendo a autorização do usuário e a leitura de campanhas, contatos e histórico. Contatos descadastrados, sem email, fora da campanha ou com registro anterior continuam bloqueados. Respostas incertas interrompem o lote, sem reenvio automático.
 
-O acompanhamento continua em **Envios de Campanha** na oportunidade. Permanecem os bloqueios de descadastro, email ausente, destinatário fora da campanha e endereço já registrado. Respostas incertas interrompem o lote, sem reenvio automático. Aceito pelo Zoho não comprova entrega ou abertura. Até 200 membros, com bloqueio de leituras incompletas; quotas da conta se aplicam.
+A lista **Envios de Campanha** mantém o assunto, a mensagem, o remetente e o destinatário. **Submetido ao envio nativo** significa que o sendmail terminou sem exceção; não comprova entrega ou abertura e não fornece o message_id do contrato da API de envio anterior. Uma falha na gravação do recibo interrompe o lote, preserva a trava e mantém a contagem da submissão já ocorrida. Registros anteriores e seus IDs não são removidos.
 
-A conexão de envio é a existente **zoho_crm**, sem alteração de escopos. Na última prova real ela aparecia conectada mas falhou nas consultas de remetentes e organização. O envio permanece bloqueado enquanto essa execução não funcionar. Nenhum email real foi enviado na validação.
+Feche e abra novamente o formulário após a atualização. Versões antigas do formulário são bloqueadas antes do disparo nativo, evitando interpretar os novos recibos como falha genérica.
 
-`npm run check` executa 22 testes do widget com SDK simulado: criação, envio do rascunho salvo, ausência de segundo editor/prévia, duplo clique, descadastro, alterações concorrentes, resposta perdida e falha no recibo. A função privada mantém compatibilidade com as ações existentes e acrescenta o parâmetro `use_saved_draft: true`.
+`npm run check`: 27 testes com SDK simulado, sem enviar emails reais. Inclui criação preservada, envio do rascunho salvo, transporte nativo, duplo clique, descadastro, resposta perdida, recibo ausente, histórico existente e contagem sem afirmar entrega.
 
 ## Histórico da criação para revisão
 
