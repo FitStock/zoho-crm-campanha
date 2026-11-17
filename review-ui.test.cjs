@@ -94,6 +94,23 @@ const mailPreviewResult = {status:"success",campaign_id:"800",from:"sender@examp
 ]};
 const submittedMail = {status:"submitted",transport:"native_sendmail",receipt_saved:true};
 
+test("new draft follows Andre's text and formats opportunity fields in Portuguese", async () => {
+  const s = await setup([]);
+  const draft = s.run('montarRascunho({produto_nome:"negro de fumo",quantidade:"10000",unidade:"Kilos",validade_produto:"2028-12-30",preco_unitario:13.21,moeda:"BRL"})');
+  assert.equal(draft.replace(/\u00a0/g," "), "Olá, {{Primeiro_Nome}},\nTudo bem?!\nEstamos com uma oportunidade para negro de fumo, caso vocês utilizem, é só avisar que enviarei mais informações.\n\nProduto: negro de fumo\nQuantidade: 10.000 Kilos\nValidade: 30/12/2028\nPreço: R$ 13,21\n\nAtenciosamente,");
+  assert.doesNotMatch(draft,/Nome_Contato|WhatsApp|#Produto|\$\{Contatos/);
+});
+
+test("draft retains zero and decimal quantities and does not invent missing commercial terms", async () => {
+  const s = await setup([]);
+  assert.match(s.run('montarRascunho({quantidade:0,preco_unitario:0,moeda:"BRL"})').replace(/\u00a0/g," "),/Quantidade: 0\nValidade: Não informado\nPreço: R\$ 0,00/);
+  assert.match(s.run('montarRascunho({quantidade:"12.345",unidade:"Litros"})'),/Quantidade: 12,345 Litros/);
+  const missing = s.run('montarRascunho({})');
+  assert.match(missing,/Produto: Não informado\nQuantidade: Não informado\nValidade: Não informado\nPreço: Não informado/);
+  assert.equal(s.run('formatarValidade("2028-02-30")'),"Não informado");
+  assert.equal(s.run('formatarValidade("2028-01-01")'),"01/01/2028");
+});
+
 test("authenticated organization sender can be selected and reaches preflight without sending", async () => {
   const sharedConfig = {...mailConfig, senders:[
     ...mailConfig.senders,
