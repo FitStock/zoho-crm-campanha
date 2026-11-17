@@ -94,6 +94,30 @@ const mailPreviewResult = {status:"success",campaign_id:"800",from:"sender@examp
 ]};
 const submittedMail = {status:"submitted",transport:"native_sendmail",receipt_saved:true};
 
+test("authenticated organization sender can be selected and reaches preflight without sending", async () => {
+  const sharedConfig = {...mailConfig, senders:[
+    ...mailConfig.senders,
+    {email:"andre.grell@fitstock.com.br",user_name:"André Grell",type:"native_organization"}
+  ]};
+  const s = await setup([sharedConfig,mailCampaign,{status:"error",message:"Validação encerrada sem envio"}]);
+  await s.run("prepararEnvioMassa()");
+  const sender = s.doc.getElementById("emailSender");
+  assert.equal(sender.options.length,2);
+  assert.equal(sender.options[1].textContent,"André Grell <andre.grell@fitstock.com.br>");
+  sender.value="andre.grell@fitstock.com.br";
+  await s.run("enviarRascunhoSalvo()");
+  assert.equal(s.calls.find(c=>c.action==="mail_preview").from,"andre.grell@fitstock.com.br");
+  assert.equal(s.calls.filter(c=>c.action==="mail_send").length,0);
+});
+
+test("sender authorization failure stops the batch before any send", async () => {
+  const s = await setup([mailConfig,mailCampaign,{status:"error",message:"Remetente nao autorizado"}]);
+  await s.run("prepararEnvioMassa()");
+  await s.run("enviarRascunhoSalvo()");
+  assert.equal(s.calls.filter(c=>c.action==="mail_send").length,0);
+  assert.match(s.doc.getElementById("emailStatus").textContent,/Remetente nao autorizado/);
+});
+
 test("opening saved draft never sends and provides no second editor or preview controls", async () => {
   const s=await setup([mailConfig,mailCampaign]); await s.run("prepararEnvioMassa()");
   assert.deepEqual(s.calls.slice(1).map(c=>c.action),["mail_config","mail_campaign"]);
