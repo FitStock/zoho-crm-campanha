@@ -183,7 +183,7 @@
         <input type="text" id="assuntoInput" maxlength="255" placeholder="Carregando...">
     </div>
     <div class="form-group">
-        <label for="corpoInput">Mensagem (Com Variáveis {{Nome_Contato}} e {{Nome_Empresa}})</label>
+        <label for="corpoInput">Mensagem ({{Primeiro_Nome}} personaliza o nome sem sobrenome)</label>
         <textarea id="corpoInput" maxlength="32000" rows="5" placeholder="Carregando..."></textarea>
     </div>
 </div>
@@ -334,6 +334,33 @@ function responsavelSelecionado() {
         return null;
     }
 
+    function formatarNumero(value, currency) {
+        if (value === null || value === undefined || String(value).trim() === "") return "Não informado";
+        const number = Number(value);
+        if (!Number.isFinite(number)) return "Não informado";
+        if (currency) {
+            if (!/^[A-Z]{3}$/.test(currency)) return "Não informado";
+            try { return new Intl.NumberFormat("pt-BR", {style:"currency",currency}).format(number); }
+            catch { return "Não informado"; }
+        }
+        return new Intl.NumberFormat("pt-BR", {maximumFractionDigits:9}).format(number);
+    }
+    function formatarValidade(value) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+        if (!match) return "Não informado";
+        const [_, year, month, day] = match;
+        const date = new Date(Date.UTC(Number(year),Number(month)-1,Number(day)));
+        if (date.getUTCFullYear() !== Number(year) || date.getUTCMonth() !== Number(month)-1 || date.getUTCDate() !== Number(day)) return "Não informado";
+        return `${day}/${month}/${year}`;
+    }
+    function montarRascunho(data) {
+        const product = String(data.produto_nome || "").trim() || "Não informado";
+        const unit = String(data.unidade || "").trim();
+        const quantity = formatarNumero(data.quantidade);
+        const price = formatarNumero(data.preco_unitario, String(data.moeda || "BRL"));
+        return `Olá, {{Primeiro_Nome}},\nTudo bem?!\nEstamos com uma oportunidade para ${product}, caso vocês utilizem, é só avisar que enviarei mais informações.\n\nProduto: ${product}\nQuantidade: ${quantity}${unit ? " " + unit : ""}\nValidade: ${formatarValidade(data.validade_produto)}\nPreço: ${price}\n\nAtenciosamente,`;
+    }
+
     async function carregarDados() {
         campanhaPronta = false;
         document.getElementById("campanhaButton").disabled = true;
@@ -358,12 +385,11 @@ function responsavelSelecionado() {
 
             if (dataObj && dataObj.status === "success" && Array.isArray(dataObj.empresas)) {
                 const pNome = dataObj.produto_nome || "Produto";
-                const qtd = dataObj.quantidade || "Consulte-nos";
 
                 document.getElementById("nomeCampanha").value = `Campanha Fitstock - ${pNome}`;
                 document.getElementById("assuntoInput").value = `Oportunidade Comercial: ${pNome} disponível na Fitstock`;
 
-                const templateTexto = `Olá {{Nome_Contato}}, tudo bem?\n\nIdentificamos uma oportunidade exclusiva para a {{Nome_Empresa}} referente ao fornecimento do item ${pNome}.\n\nTemos um lote disponível com as seguintes condições de mercado:\n- Produto: ${pNome}\n- Quantidade Disponível: ${qtd}\n\nCaso tenham demanda para este produto ou queiram alinhar condições de negociação, entrem em contato diretamente com o nosso time comercial:\n\nWhatsApp André Grell: +55 11 99312-2497 ( https://wa.me/5511993122497?text=Olá%20André,%20tenho%20interesse%20no%20produto%20${encodeURIComponent(pNome)} )\nWhatsApp Natália: +55 11 91123-5550 ( https://wa.me/5511911235550?text=Olá%20Natália,%20tenho%20interesse%20no%20produto%20${encodeURIComponent(pNome)} )\n\nFicamos no aguardo do seu retorno!\n\nAtenciosamente,\nEquipe Fitstock`;
+                const templateTexto = montarRascunho(dataObj);
 
                 document.getElementById("corpoInput").value = templateTexto;
 
