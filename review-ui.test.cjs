@@ -94,6 +94,84 @@ const mailPreviewResult = {status:"success",campaign_id:"800",from:"sender@examp
 ]};
 const submittedMail = {status:"submitted",transport:"native_sendmail",receipt_saved:true};
 
+const directConfig = {...mailCampaign, mode:"direct",senders:mailConfig.senders,transport:"native_sendmail"};
+async function openDirect(results) {
+  const s = await setup(results);
+  s.doc.getElementById("modoPreparacao").value = "direct";
+  s.run("alterarModoPreparacao()");
+  await s.run("prepararEnvioMassa()");
+  return s;
+}
+test("direct preparation has no campaign dependency and never creates a campaign",async()=>{
+  const s = await openDirect([directConfig]);
+  assert.deepEqual(s.calls.slice(1).map(c=>c.action),["direct_config"]);
+  assert.equal(s.doc.getElementById("campaignFields").hidden,true);
+  assert.equal(s.doc.getElementById("campaignCreateAction").hidden,true);
+  assert.equal(s.doc.getElementById("emailCampaign").hidden,true);
+  assert.equal(s.doc.getElementById("emailSendFinal").disabled,false);
+  assert.equal(s.doc.getElementById("emailSendFinal").textContent,"Enviar emails agora");
+  await s.run("executarCampanha()");
+  assert.equal(s.calls.length,2);
+});
+test("direct send freezes the current text, recipients and sender without a hidden campaign",async()=>{
+  const s = await openDirect([directConfig,mailPreviewResult,"waiting",submittedMail]);
+  s.doc.getElementById("assuntoInput").value="Assunto direto";
+  s.doc.getElementById("corpoInput").value="Texto direto {{Primeiro_Nome}}";
+  const sending=s.run("enviarRascunhoSalvo()");
+  await new Promise(r=>setImmediate(r));
+  assert.equal(s.doc.getElementById("corpoInput").disabled,true);
+  s.doc.getElementById("corpoInput").value="Alterado durante envio";
+  s.doc.getElementById("emailSender").value="attacker@example.invalid";
+  s.doc.getElementById("modoPreparacao").value="campaign";
+  s.run("alterarModoPreparacao()");
+  assert.equal(s.doc.getElementById("modoPreparacao").value,"direct");
+  s.release({details:{output:JSON.stringify(submittedMail)}});await sending;
+  const calls=s.calls.slice(1);
+  assert.deepEqual(calls.map(c=>c.action),["direct_config","direct_preview","direct_send","direct_send"]);
+  for(const c of calls.slice(1)){
+    assert.equal(c.subject,"Assunto direto");
+    assert.equal(c.body,"Texto direto {{Primeiro_Nome}}");
+    assert.equal(c.from,"sender@example.invalid");
+    assert.equal("campaign_id" in c,false);
+    assert.equal("use_saved_draft" in c,false);
+  }
+});
+test("direct config rejects incomplete membership and blocks unknown eligibility",async()=>{
+  const incomplete=await openDirect([{...directConfig,members:[mailCampaign.members[0]]}]);
+  assert.equal(incomplete.doc.getElementById("emailSendFinal").disabled,true);
+  const unknown=await openDirect([{...directConfig,members:mailCampaign.members.map(c=>({id:c.id,Email:c.Email}))}]);
+  assert.equal(unknown.doc.querySelectorAll('.email-contact:checked:not([data-blocked])').length,0);
+  await unknown.run("enviarRascunhoSalvo()");
+  assert.equal(unknown.calls.length,2);
+});
+test("direct lost response or duplicate lock stops the batch and never retries",async()=>{
+  for(const answer of ["lost",{status:"blocked",message:"Envio ja registrado"}]){
+    const s=await openDirect([directConfig,mailPreviewResult,answer]);
+    await s.run("enviarRascunhoSalvo()");await s.run("enviarRascunhoSalvo()");
+    assert.equal(s.calls.filter(c=>c.action==="direct_send").length,1);
+    assert.match(s.doc.getElementById("emailStatus").textContent,/Não haverá reenvio automático/);
+  }
+});
+test("direct input and audience validation happens before any send",async()=>{
+  const s=await openDirect([directConfig]);
+  for(const invalid of ["","a".repeat(256),"emoji 📲"]){
+    s.doc.getElementById("assuntoInput").value=invalid;
+    await s.run("enviarRascunhoSalvo()");
+  }
+  assert.equal(s.calls.length,2);
+  s.run("fecharRevisaoEnvio();marcarTodos(false)");
+  await s.run("prepararEnvioMassa()");assert.equal(s.calls.length,2);
+});
+test("returning from direct mode preserves the campaign flow and edited draft",async()=>{
+  const s=await openDirect([directConfig]);
+  s.doc.getElementById("corpoInput").value="Rascunho editado";
+  s.doc.getElementById("modoPreparacao").value="campaign";s.run("alterarModoPreparacao()");
+  assert.equal(s.doc.getElementById("campaignFields").hidden,false);
+  assert.equal(s.doc.getElementById("campaignCreateAction").hidden,false);
+  assert.equal(s.doc.getElementById("corpoInput").value,"Rascunho editado");
+  assert.equal(s.doc.querySelector('.chk-membro').disabled,false);
+});
+
 test("new draft follows Andre's text and formats opportunity fields in Portuguese", async () => {
   const s = await setup([]);
   const draft = s.run('montarRascunho({produto_nome:"negro de fumo",quantidade:"10000",unidade:"Kilos",validade_produto:"2028-12-30",preco_unitario:13.21,moeda:"BRL"})');

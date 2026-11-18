@@ -1,3 +1,20 @@
+## Envio direto opcional — atualização de 18/11/2026
+
+Na abertura, o modo de campanha continua selecionado. Em **Como deseja trabalhar?**, escolha:
+
+- **Criar campanha para revisão / enviar campanha existente:** mantém a criação sem disparo e o envio posterior do rascunho salvo.
+- **Enviar direto sem campanha:** selecione até 200 contatos associados à oportunidade, edite o assunto e a mensagem, clique em **Preparar envio direto**, escolha o remetente e clique em **Enviar emails agora**. Não cria campanha nem vínculo de campanha. A preparação não envia nada.
+
+O envio direto fica disponível ao responsável pela oportunidade e aos usuários Administrator. O endereço de André continua reservado ao próprio André e ao perfil Administrator. Os campos comerciais do rascunho e `{{Primeiro_Nome}}` seguem funcionando. Sem campanha, o texto é o preenchido na tela no clique final; cada tentativa é registrada em **Envios de Campanha**, com a oportunidade, contato, conteúdo, remetente e usuário executor.
+
+A rotina relê os vínculos, o contato, a elegibilidade e o remetente no servidor. A lista de vínculos deve ser lida integralmente (limite de 2.000); somente até 200 destinatários são aceitos por lote. No envio direto, a chave única é formada por oportunidade, email normalizado e conteúdo personalizado (assunto e corpo). O mesmo envio direto permanece bloqueado após reabrir a tela, mudar o usuário/remetente, falhar ou perder a resposta. Um conteúdo diferente forma outro envio. A regra atual das campanhas e seus registros anteriores permanece preservada; a chave direta não é uma trava global entre campanhas diferentes.
+
+O conteúdo é congelado no início do lote. Uma resposta incerta interrompe o processamento, sem repetição automática. `Submetido ao envio nativo` não comprova entrega ou abertura. Não exclua o histórico para forçar reenvio.
+
+As funções existentes do CRM são publicadas separadamente; seus fontes e testes de servidor ficam no workspace administrativo. A publicação de Pages atualiza somente a interface. Os testes de servidor executam um subconjunto do fonte Deluge com IO simulado e não substituem a compilação do Zoho nem uma conferência real de leitura. Os testes não enviam emails.
+
+---
+
 # Campanhas com envio nativo — FitStock
 
 Atualizado em 13/11/2026.
